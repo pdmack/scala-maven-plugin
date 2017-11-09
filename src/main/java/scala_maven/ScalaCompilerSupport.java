@@ -5,7 +5,6 @@ import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.StringUtils;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
-import sbt_inc.SbtIncrementalCompiler;
 import scala_maven_executions.JavaMainCaller;
 import scala_maven_executions.MainHelper;
 
@@ -49,8 +48,6 @@ public abstract class ScalaCompilerSupport extends ScalaSourceMojoSupport {
     abstract protected List<String> getClasspathElements() throws Exception;
 
     private long _lastCompileAt = -1;
-
-    private SbtIncrementalCompiler incremental;
 
     /**
      * Analysis cache file for incremental recompilation.
@@ -110,14 +107,6 @@ public abstract class ScalaCompilerSupport extends ScalaSourceMojoSupport {
     }
 
     protected int compile(List<File> sourceRootDirs, File outputDir, File analysisCacheFile, List<String> classpathElements, boolean compileInLoop) throws Exception, InterruptedException {
-        if (!compileInLoop && INCREMENTAL.equals(recompileMode)) {
-            // TODO - Do we really need this dupliated here?
-            if (!outputDir.exists()) {
-              outputDir.mkdirs();
-            }
-            // if not compileInLoop, invoke incrementalCompile immediately
-            return incrementalCompile(classpathElements, sourceRootDirs, outputDir, analysisCacheFile, compileInLoop);
-        }
 
         long t0 = System.currentTimeMillis();
         LastCompilationInfo lastCompilationInfo = LastCompilationInfo.find(sourceRootDirs, outputDir);
@@ -138,16 +127,6 @@ public abstract class ScalaCompilerSupport extends ScalaSourceMojoSupport {
             outputDir.mkdirs();
         }
         long t1 = System.currentTimeMillis();
-
-        if (compileInLoop && INCREMENTAL.equals(recompileMode)) {
-            // if compileInLoop, do not invoke incrementalCompile when there's no change
-            int retCode = incrementalCompile(classpathElements, sourceRootDirs, outputDir, analysisCacheFile, compileInLoop);
-            _lastCompileAt = t1;
-            if (retCode == 1) {
-                lastCompilationInfo.setLastSuccessfullTS(t1);
-            }
-            return retCode;
-        }
 
         getLog().info(String.format("Compiling %d source files to %s at %d", files.size(), outputDir.getAbsolutePath(), t1));
         JavaMainCaller jcmd = getScalaCommand();
@@ -270,47 +249,6 @@ public abstract class ScalaCompilerSupport extends ScalaSourceMojoSupport {
     //
     // Incremental compilation
     //
-
-    @SuppressWarnings("unchecked")
-    protected int incrementalCompile(List<String> classpathElements, List<File> sourceRootDirs, File outputDir, File cacheFile, boolean compileInLoop) throws Exception, InterruptedException {
-        List<File> sources = findSourceWithFilters(sourceRootDirs);
-        if (sources.isEmpty()) {
-            return -1;
-        }
-
-        if (incremental == null) {
-            File libraryJar = getLibraryJar();
-            File compilerJar = getCompilerJar();
-            List<File> extraJars = getCompilerDependencies();
-            extraJars.remove(libraryJar);
-            String sbtGroupId = SbtIncrementalCompiler.SBT_GROUP_ID;
-            String xsbtiArtifactId = SbtIncrementalCompiler.XSBTI_ARTIFACT_ID;
-            String compilerInterfaceArtifactId = SbtIncrementalCompiler.COMPILER_INTERFACE_ARTIFACT_ID;
-            String compilerInterfaceClassifier = SbtIncrementalCompiler.COMPILER_INTERFACE_CLASSIFIER;
-            String sbtVersion = findVersionFromPluginArtifacts(sbtGroupId, SbtIncrementalCompiler.COMPILER_INTEGRATION_ARTIFACT_ID);
-            File xsbtiJar = getPluginArtifactJar(sbtGroupId, xsbtiArtifactId, sbtVersion);
-            List<String> zincArgs = StringUtils.isEmpty(addZincArgs) ? new LinkedList<String>() : (List<String>) Arrays.asList(StringUtils.split(addZincArgs, "|"));
-            File interfaceSrcJar = getPluginArtifactJar(sbtGroupId, compilerInterfaceArtifactId, sbtVersion, compilerInterfaceClassifier);
-           	incremental = new SbtIncrementalCompiler(useZincServer, zincPort, libraryJar, compilerJar, extraJars, xsbtiJar, interfaceSrcJar, getLog(), zincArgs);
-        }
-
-        classpathElements.remove(outputDir.getAbsolutePath());
-        List<String> scalacOptions = getScalaOptions();
-        List<String> javacOptions = getJavacOptions();
-        Map<File, File> cacheMap = getAnalysisCacheMap();
-
-        try {
-            incremental.compile(project.getBasedir(), classpathElements, sources, outputDir, scalacOptions, javacOptions, cacheFile, cacheMap, compileOrder, toolchainManager.getToolchainFromBuildContext("jdk", session));
-        } catch (xsbti.CompileFailed e) {
-            if (compileInLoop) {
-                compileErrors = true;
-            } else {
-                throw e;
-            }
-        }
-
-        return 1;
-    }
 
     protected Map<File, File> getAnalysisCacheMap() {
         HashMap<File, File> map = new HashMap<File, File>();

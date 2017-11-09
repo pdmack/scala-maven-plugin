@@ -101,6 +101,7 @@
     <encoding>UTF-8</encoding>
     <project.build.sourceEncoding>${encoding}</project.build.sourceEncoding>
     <github.global.server>github</github.global.server>
+    <starr.version>2.11.8</starr.version>
   </properties>
 
   <prerequisites>
@@ -186,12 +187,6 @@
       <version>4.8.1</version>
       <scope>test</scope>
     </dependency>
-    <!-- sbt incremental compiler -->
-    <dependency>
-      <groupId>com.typesafe.zinc</groupId>
-      <artifactId>zinc</artifactId>
-      <version>0.3.9</version>
-    </dependency>
 <!--
     <dependency>
       <groupId>com.typesafe.sbt</groupId>
@@ -266,6 +261,9 @@
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
+            <excludes>
+               <exclude>sbt_inc/*</exclude>
+            </excludes>
           <compilerArgument>-Xlint:deprecation</compilerArgument>
           <target>1.6</target>
         </configuration>
@@ -434,8 +432,8 @@
               <properties>
                 <scala.version.27>2.7.7</scala.version.27>
                 <scala.version.28>2.8.2</scala.version.28>
-                <scala.version.lastrelease>2.12.2</scala.version.lastrelease>
-                <scala.version.next>2.12.2</scala.version.next>
+                <scala.version.lastrelease>${starr.version}</scala.version.lastrelease>
+                <scala.version.next>${starr.version}</scala.version.next>
                 <scala.macroparadise.version>2.10.2-SNAPSHOT</scala.macroparadise.version>
                 <scala.macroparadise.organisation>org.scala-lang.macro-paradise</scala.macroparadise.organisation>
               </properties>
@@ -452,6 +450,7 @@
                 <pomExclude>**/m*/pom.xml</pomExclude>
                 <pomExclude>**/test_macroparadise/macro/pom.xml</pomExclude>
                 <pomExclude>**/test_macroparadise/core/pom.xml</pomExclude>
+                <pomExclude>**/test-incremental-compile/pom.xml</pomExclude>
                 <pomExclude>scalac-plugin/src/it/**/pom.xml</pomExclude>
               </pomExcludes>
               <preBuildHookScript>setup.groovy</preBuildHookScript>
